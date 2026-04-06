@@ -8,7 +8,7 @@ interface TextBlockProps {
   content: string;
   delay?: number;
   onThread?: () => void;
-  onEntitySelect?: (entity: Entity, x: number, y: number) => void;
+  onEntitySelect?: (entity: Entity, x: number, y: number, isMulti?: boolean) => void;
 }
 
 interface TextSegment {
@@ -129,6 +129,7 @@ export function TextBlock({ content, onThread, onEntitySelect }: TextBlockProps)
       },
       x,
       y,
+      e.shiftKey || e.ctrlKey,
     );
   };
 

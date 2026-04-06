@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ReferenceArea, ReferenceDot, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ReferenceDot, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { ChartConfig, ChartElement } from '../../data/types';
 import { BlockActions, FullscreenModal } from './BlockActions';
 
@@ -8,11 +8,24 @@ interface ChartBlockProps {
   chart: ChartConfig;
   delay?: number;
   onThread?: () => void;
-  onElementSelect?: (element: ChartElement, x: number, y: number) => void;
+  onElementSelect?: (element: ChartElement, x: number, y: number, isMulti?: boolean) => void;
 }
 
 const CHART_COLORS = ['#6366F1', '#8B5CF6', '#EC4899', '#10B981', '#F59E0B'];
 const HOVER_COLORS = ['#4F46E5', '#7C3AED', '#DB2777', '#059669', '#D97706'];
+
+// Module-level ref to track modifier keys across all chart instances
+const modifierRef = { shift: false, ctrl: false };
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', (e) => {
+    modifierRef.shift = e.shiftKey;
+    modifierRef.ctrl = e.ctrlKey || e.metaKey;
+  });
+  document.addEventListener('keyup', (e) => {
+    modifierRef.shift = e.shiftKey;
+    modifierRef.ctrl = e.ctrlKey || e.metaKey;
+  });
+}
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -116,7 +129,8 @@ function ChartRenderer({
 }: {
   chart: ChartConfig; width: number; height: number;
   hoveredIndex: number | null; selectedIndex: number | null;
-  onHover: (i: number | null) => void; onLeave: () => void; onSelect: (i: number) => void;
+  onHover: (i: number | null) => void; onLeave: () => void;
+  onSelect: (i: number, modifiers: { shift: boolean; ctrl: boolean }) => void;
 }) {
   const { type, data, dataKey, nameKey } = chart;
 
@@ -150,7 +164,7 @@ function ChartRenderer({
                 stroke="#6366F1"
                 strokeWidth={2}
                 style={{ cursor: 'pointer' }}
-                onClick={() => onSelect(i)}
+                onClick={() => onSelect(i, modifierRef)}
                 onMouseEnter={() => onHover(i)}
                 onMouseLeave={onLeave}
               />
@@ -276,6 +290,7 @@ export function ChartBlock({ chart, onThread, onElementSelect }: ChartBlockProps
     const rect = el?.getBoundingClientRect();
     const x = rect ? rect.left + rect.width / 2 : 500;
     const y = rect ? rect.top + rect.height / 2 : 300;
+    const isMulti = modifierRef.shift || modifierRef.ctrl;
     onElementSelect({
       type: type === 'pie' ? 'pieSlice' : type === 'line' ? 'linePoint' : type,
       dataIndex: i,
@@ -284,7 +299,7 @@ export function ChartBlock({ chart, onThread, onElementSelect }: ChartBlockProps
       label: String(entry[chart.nameKey] ?? ''),
       chartType: type,
       chartTitle: title,
-    }, x, y);
+    }, x, y, isMulti);
     setSelectedIdx(i);
   };
 

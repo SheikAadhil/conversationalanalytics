@@ -34,28 +34,10 @@ function App() {
   const inputRef = useRef<HTMLDivElement>(null);
 
   // Track modifier keys for multi-select
-  const [modifiers, setModifiers] = useState({ shift: false, meta: false });
   // Autocomplete suggestions — regenerated when input text or chips change
   const [suggestions, setSuggestions] = useState<string[]>([]);
   // Current input text (tracked to generate suggestions)
   const [inputText, setInputText] = useState('');
-
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    setModifiers({ shift: e.shiftKey, meta: e.metaKey || e.ctrlKey });
-  }, []);
-
-  const handleKeyUp = useCallback((e: KeyboardEvent) => {
-    setModifiers({ shift: e.shiftKey, meta: e.metaKey || e.ctrlKey });
-  }, []);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('keyup', handleKeyUp);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('keyup', handleKeyUp);
-    };
-  }, [handleKeyDown, handleKeyUp]);
 
   // Build chips from all current selections (max 3)
   const visibleChips = useMemo(
@@ -136,9 +118,9 @@ function App() {
   };
 
   // Handle entity selection — add to selections if modifier held, else replace
-  const handleEntitySelect = (entity: Entity, x: number, y: number) => {
+  const handleEntitySelect = (entity: Entity, x: number, y: number, isMulti?: boolean) => {
     const newSel: Selection = { type: 'entity', entity, x, y };
-    if (modifiers.shift || modifiers.meta) {
+    if (isMulti) {
       setSelections(prev => {
         if (prev.some(s => s.type === 'entity' && s.entity?.id === entity.id)) return prev;
         const next = [...prev, newSel];
@@ -150,9 +132,9 @@ function App() {
   };
 
   // Handle chart element selection — add to selections if modifier held, else replace
-  const handleChartElementSelect = (element: ChartElement, x: number, y: number) => {
+  const handleChartElementSelect = (element: ChartElement, x: number, y: number, isMulti?: boolean) => {
     const newSel: Selection = { type: 'chartElement', chartElement: element, x, y };
-    if (modifiers.shift || modifiers.meta) {
+    if (isMulti) {
       setSelections(prev => {
         if (prev.some(s => s.type === 'chartElement' && s.chartElement?.dataIndex === element.dataIndex && s.chartElement?.chartType === element.chartType)) return prev;
         const next = [...prev, newSel];
@@ -168,9 +150,10 @@ function App() {
     cell: { rowIndex: number; colIndex: number; value: string | number; header: string; rowLabel: string },
     x: number,
     y: number,
+    isMulti?: boolean,
   ) => {
     const newSel: Selection = { type: 'tableCell', tableCell: cell, x, y };
-    if (modifiers.shift || modifiers.meta) {
+    if (isMulti) {
       setSelections(prev => {
         if (prev.some(s => s.type === 'tableCell' && s.tableCell?.rowIndex === cell.rowIndex && s.tableCell?.colIndex === cell.colIndex)) return prev;
         const next = [...prev, newSel];

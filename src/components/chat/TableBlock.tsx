@@ -4,6 +4,19 @@ import { Search, ArrowUpDown, ArrowUp, ArrowDown, SlidersHorizontal } from 'luci
 import type { TableData } from '../../data/types';
 import { BlockActions, FullscreenModal } from './BlockActions';
 
+// Module-level ref to track modifier keys
+const modifierRef = { shift: false, ctrl: false };
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', (e) => {
+    modifierRef.shift = e.shiftKey;
+    modifierRef.ctrl = e.ctrlKey || e.metaKey;
+  });
+  document.addEventListener('keyup', (e) => {
+    modifierRef.shift = e.shiftKey;
+    modifierRef.ctrl = e.ctrlKey || e.metaKey;
+  });
+}
+
 interface TableBlockProps {
   table: TableData;
   delay?: number;
@@ -14,7 +27,7 @@ interface TableBlockProps {
     value: string | number;
     header: string;
     rowLabel: string;
-  }, x: number, y: number) => void;
+  }, x: number, y: number, isMulti?: boolean) => void;
 }
 
 function isNumeric(val: string | number): boolean {
@@ -110,7 +123,7 @@ export function TableBlock({ table, onThread, onCellSelect }: TableBlockProps) {
       value,
       header: headers[colIndex],
       rowLabel: String(rows[rowIndex][0]),
-    }, x, y);
+    }, x, y, modifierRef.shift || modifierRef.ctrl);
   };
 
   const SortIcon = () => {
