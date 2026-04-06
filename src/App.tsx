@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useChat } from './hooks/useChat';
 import { Sidebar } from './components/layout/Sidebar';
 import { ChatDrawer } from './components/chat/ChatDrawer';
@@ -6,7 +6,7 @@ import { ContextualMenu } from './components/chat/ContextualMenu';
 import type { BreadcrumbNode } from './components/chat/Breadcrumb';
 import type { ChatMessage, MessageBlock, Entity, Selection, ChartElement, ContextChip } from './data/types';
 import type { EntityAction } from './utils/entityRecognizer';
-import { buildContextChips, buildFullQuery } from './utils/contextChipUtils';
+import { buildContextChips, buildFullQuery, generateSuggestions } from './utils/contextChipUtils';
 // Canvas panel archived — see src/archived/CanvasArchived.tsx
 
 function App() {
@@ -28,15 +28,46 @@ function App() {
     deleteThread,
   } = useChat();
 
-  // Selection state
-  const [selection, setSelection] = useState<Selection>({ type: null });
+  // Selection state — supports multi-select up to 3 chips
+  const [selections, setSelections] = useState<Selection[]>([]);
   // Ref to the chat input container — ContextualMenu ignores clicks inside it
   const inputRef = useRef<HTMLDivElement>(null);
 
-  // Chips appear immediately when something is selected (no focus required)
+  // Track modifier keys for multi-select
+  const [modifiers, setModifiers] = useState({ shift: false, meta: false });
+  // Autocomplete suggestions — regenerated when input text or chips change
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  // Current input text (tracked to generate suggestions)
+  const [inputText, setInputText] = useState('');
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    setModifiers({ shift: e.shiftKey, meta: e.metaKey || e.ctrlKey });
+  }, []);
+
+  const handleKeyUp = useCallback((e: KeyboardEvent) => {
+    setModifiers({ shift: e.shiftKey, meta: e.metaKey || e.ctrlKey });
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [handleKeyDown, handleKeyUp]);
+
+  // Build chips from all current selections (max 3)
   const visibleChips = useMemo(
-    () => (selection.type !== null ? buildContextChips(selection) : []),
-    [selection]
+    () => {
+      const chips: ContextChip[] = [];
+      for (const sel of selections) {
+        const built = buildContextChips(sel);
+        chips.push(...built);
+      }
+      return chips.slice(0, 3);
+    },
+    [selections]
   );
 
   // Breadcrumb path — accumulates as user drills down
@@ -91,7 +122,7 @@ function App() {
     openThread(message, block, blockIndex);
     setThreadMessages([]);
     setThreadVisibleBlocks(new Set());
-    setSelection({ type: null });
+    setSelections([]);
   };
 
   const handleSend = (content: string) => {
@@ -100,30 +131,57 @@ function App() {
 
   const handleNewChat = () => {
     startNewChat();
-    setSelection({ type: null });
+    setSelections([]);
     setSelectionPath([{ id: 'root', label: 'Overview', type: 'root' }]);
   };
 
-  // Handle entity selection from text blocks
+  // Handle entity selection — add to selections if modifier held, else replace
   const handleEntitySelect = (entity: Entity, x: number, y: number) => {
-    setSelection({ type: 'entity', entity, x, y });
+    const newSel: Selection = { type: 'entity', entity, x, y };
+    if (modifiers.shift || modifiers.meta) {
+      setSelections(prev => {
+        if (prev.some(s => s.type === 'entity' && s.entity?.id === entity.id)) return prev;
+        const next = [...prev, newSel];
+        return next.slice(-3); // max 3
+      });
+    } else {
+      setSelections([newSel]);
+    }
   };
 
-  // Handle chart element selection
+  // Handle chart element selection — add to selections if modifier held, else replace
   const handleChartElementSelect = (element: ChartElement, x: number, y: number) => {
-    setSelection({ type: 'chartElement', chartElement: element, x, y });
+    const newSel: Selection = { type: 'chartElement', chartElement: element, x, y };
+    if (modifiers.shift || modifiers.meta) {
+      setSelections(prev => {
+        if (prev.some(s => s.type === 'chartElement' && s.chartElement?.dataIndex === element.dataIndex && s.chartElement?.chartType === element.chartType)) return prev;
+        const next = [...prev, newSel];
+        return next.slice(-3);
+      });
+    } else {
+      setSelections([newSel]);
+    }
   };
 
-  // Handle table cell selection
+  // Handle table cell selection — add to selections if modifier held, else replace
   const handleTableCellSelect = (
     cell: { rowIndex: number; colIndex: number; value: string | number; header: string; rowLabel: string },
     x: number,
     y: number,
   ) => {
-    setSelection({ type: 'tableCell', tableCell: cell, x, y });
+    const newSel: Selection = { type: 'tableCell', tableCell: cell, x, y };
+    if (modifiers.shift || modifiers.meta) {
+      setSelections(prev => {
+        if (prev.some(s => s.type === 'tableCell' && s.tableCell?.rowIndex === cell.rowIndex && s.tableCell?.colIndex === cell.colIndex)) return prev;
+        const next = [...prev, newSel];
+        return next.slice(-3);
+      });
+    } else {
+      setSelections([newSel]);
+    }
   };
 
-  // Handle contextual menu action
+  // Handle contextual menu action — removes the acted-upon selection from the array
   const handleAction = (action: string, sel: Selection) => {
     let query = '';
     let newNode: BreadcrumbNode | null = null;
@@ -156,53 +214,70 @@ function App() {
 
     if (query) {
       sendMessage(query);
-      // Add to breadcrumb path
       if (newNode) {
         setSelectionPath((prev) => [...prev, newNode!]);
       }
     }
-    setSelection({ type: null });
+    // Remove the acted-upon selection from the array
+    setSelections(prev => prev.filter(s => s !== sel));
   };
 
   // Navigate breadcrumb to a specific level
   const handleBreadcrumbNavigate = (index: number) => {
     if (index === 0) {
-      // Reset to root
       setSelectionPath([{ id: 'root', label: 'Overview', type: 'root' }]);
-      setSelection({ type: null });
+      setSelections([]);
     } else {
-      // Truncate path to that level
       setSelectionPath((prev) => prev.slice(0, index + 1));
-      setSelection({ type: null });
+      setSelections([]);
     }
   };
 
   // Clear entire breadcrumb
   const handleBreadcrumbClear = () => {
     setSelectionPath([{ id: 'root', label: 'Overview', type: 'root' }]);
-    setSelection({ type: null });
+    setSelections([]);
   };
 
   const handleClearSelection = () => {
-    setSelection({ type: null });
+    setSelections([]);
   };
 
-  // Chip handlers
-  const handleRemoveChip = () => {
-    setSelection({ type: null });
+  // Chip handlers — remove a chip by its id (maps back to the selection)
+  const handleRemoveChip = (chipId: string) => {
+    setSelections(prev => {
+      const chipIdx = prev.findIndex((sel) => {
+        const chips = buildContextChips(sel);
+        return chips.some(c => c.id === chipId);
+      });
+      if (chipIdx === -1) return prev;
+      return prev.filter((_, i) => i !== chipIdx);
+    });
   };
 
   const handleEditChip = () => {
-    // Chip editing — selection persists, chip will rebuild on next focus
-    setIsInputFocused(false);
+    // Close chips view on edit
   };
 
   const handleSendWithChips = (text: string, chips: ContextChip[]) => {
     const query = buildFullQuery(chips, text);
     sendMessage(query);
-    setIsInputFocused(false);
-    setSelection({ type: null });
+    setSelections([]);
+    setInputText('');
+    setSuggestions([]);
   };
+
+  // Track input text and regenerate suggestions on each keystroke
+  const handleInputChange = useCallback((text: string) => {
+    setInputText(text);
+    setSuggestions(generateSuggestions(text, visibleChips));
+  }, [visibleChips]);
+
+  // When user taps a suggestion pill, fill the input with it
+  const handleSuggestionClick = useCallback((suggestion: string) => {
+    setInputText(suggestion);
+    setSuggestions([]);
+  }, []);
 
   const placeholder = visibleChips.length > 0
     ? `Ask about ${visibleChips.map(c => c.dimension ?? c.metric ?? c.timeScope ?? '').filter(Boolean).join(', ')}...`
@@ -221,12 +296,16 @@ function App() {
         onSelectConversation={(id) => {
           if (activeThread) closeThread();
           selectConversation(id);
-          setSelection({ type: null });
+          setSelections([]);
+          setInputText('');
+          setSuggestions([]);
           setSelectionPath([{ id: 'root', label: 'Overview', type: 'root' }]);
         }}
         onSelectThread={(id) => {
           selectThread(id);
-          setSelection({ type: null });
+          setSelections([]);
+          setInputText('');
+          setSuggestions([]);
           setSelectionPath([{ id: 'root', label: 'Overview', type: 'root' }]);
         }}
         onDeleteConversation={deleteConversation}
@@ -251,7 +330,9 @@ function App() {
         onSelectConversation={(id) => {
           if (activeThread) closeThread();
           selectConversation(id);
-          setSelection({ type: null });
+          setSelections([]);
+          setInputText('');
+          setSuggestions([]);
           setSelectionPath([{ id: 'root', label: 'Overview', type: 'root' }]);
         }}
         onSelectThread={selectThread}
@@ -260,7 +341,7 @@ function App() {
         onOpenThread={handleOpenThread}
         onCloseThread={closeThread}
         placeholder={placeholder}
-        selection={selection}
+        selections={selections}
         chips={visibleChips}
         onRemoveChip={handleRemoveChip}
         onEditChip={handleEditChip}
@@ -271,13 +352,17 @@ function App() {
         selectionPath={selectionPath}
         onBreadcrumbNavigate={handleBreadcrumbNavigate}
         onBreadcrumbClear={handleBreadcrumbClear}
+        suggestions={suggestions}
+        value={inputText}
+        onChange={handleInputChange}
+        onSuggestionClick={handleSuggestionClick}
         onInputBlur={() => {}}
         inputRef={inputRef}
       />
 
       {/* Contextual action menu */}
       <ContextualMenu
-        selection={selection}
+        selections={selections}
         onAction={handleAction}
         onClose={handleClearSelection}
         ignoreRef={inputRef}

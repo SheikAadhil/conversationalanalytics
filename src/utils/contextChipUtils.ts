@@ -85,3 +85,57 @@ export function buildFullQuery(chips: ContextChip[], text: string): string {
   const chipStr = chips.map(c => getChipDisplayLabel(c)).join(' ');
   return `[${chipStr}] ${text}`;
 }
+
+// Generate context-aware autocomplete suggestions based on current input text and active chips
+export function generateSuggestions(text: string, chips: ContextChip[]): string[] {
+  const lower = text.toLowerCase().trim();
+
+  if (!lower) return [];
+
+  // Suggestions keyed by the first word the user types
+  const firstWord = lower.split(/\s+/)[0] ?? lower;
+
+  const chipLabel = chips.length > 0
+    ? chips.map(c => c.dimension ?? c.metric ?? c.timeScope ?? '').filter(Boolean).join(' & ')
+    : 'this';
+
+  const templates: Record<string, string[]> = {
+    why: [
+      `why is ${chipLabel} higher?`,
+      `why is ${chipLabel} lower than expected?`,
+      `why did ${chipLabel} change?`,
+    ],
+    show: [
+      `show ${chipLabel} trend over time`,
+      `show breakdown of ${chipLabel}`,
+      `show ${chipLabel} vs last period`,
+    ],
+    compare: [
+      `compare ${chipLabel} across regions`,
+      `compare ${chipLabel} to target`,
+      `compare ${chipLabel} to last year`,
+    ],
+    what: [
+      `what drove ${chipLabel}?`,
+      `what factors affected ${chipLabel}?`,
+      `what is ${chipLabel}?`,
+    ],
+    how: [
+      `how does ${chipLabel} perform?`,
+      `how does ${chipLabel} compare to budget?`,
+    ],
+    list: [
+      `list top drivers of ${chipLabel}`,
+      `list factors behind ${chipLabel}`,
+    ],
+  };
+
+  const generic: string[] = [
+    `break down ${chipLabel} by dimension`,
+    `explain ${chipLabel}`,
+    `drill down into ${chipLabel}`,
+  ];
+
+  const base = templates[firstWord] ?? generic;
+  return base.slice(0, 3);
+}

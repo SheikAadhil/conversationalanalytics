@@ -4,7 +4,7 @@ import type { Selection, Entity, ChartElement } from '../../data/types';
 import { ENTITY_ACTIONS, ACTION_LABELS, type EntityAction } from '../../utils/entityRecognizer';
 
 interface ContextualMenuProps {
-  selection: Selection;
+  selections: Selection[];
   onAction: (action: string, selection: Selection) => void;
   onClose: () => void;
   ignoreRef?: React.RefObject<HTMLElement | null>;
@@ -171,17 +171,17 @@ function TableCellMenu({ cell, x, y, onAction }: {
   );
 }
 
-export function ContextualMenu({ selection, onAction, onClose, ignoreRef }: ContextualMenuProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
+export function ContextualMenu({ selections, onAction, onClose, ignoreRef }: ContextualMenuProps) {
+  // Track individual menu visibility per selection index
+  const menuRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
-      // Don't close if click is inside the menu or inside the ignored element (e.g. chat input)
-      if (menuRef.current && !menuRef.current.contains(target)) {
-        if (ignoreRef?.current && ignoreRef.current.contains(target)) return;
-        onClose();
-      }
+      if (ignoreRef?.current && ignoreRef.current.contains(target)) return;
+      // Close if click is outside ALL menus
+      const clickedInsideAny = menuRefs.current.some(ref => ref && ref.contains(target));
+      if (!clickedInsideAny) onClose();
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -195,36 +195,56 @@ export function ContextualMenu({ selection, onAction, onClose, ignoreRef }: Cont
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  if (!selection.x || !selection.y) return null;
+  if (selections.length === 0) return null;
+
+  // Assign refs: grow array if needed
+  while (menuRefs.current.length < selections.length) {
+    menuRefs.current.push(null);
+  }
 
   return (
-    <div ref={menuRef}>
-      <AnimatePresence>
-        {selection.type === 'entity' && selection.entity && (
-          <EntityMenu
-            entity={selection.entity}
-            x={selection.x}
-            y={selection.y}
-            onAction={(action) => onAction(action, selection)}
-          />
-        )}
-        {selection.type === 'chartElement' && selection.chartElement && (
-          <ChartElementMenu
-            element={selection.chartElement}
-            x={selection.x}
-            y={selection.y}
-            onAction={(action) => onAction(action, selection)}
-          />
-        )}
-        {selection.type === 'tableCell' && selection.tableCell && (
-          <TableCellMenu
-            cell={selection.tableCell}
-            x={selection.x}
-            y={selection.y}
-            onAction={(action) => onAction(action, selection)}
-          />
-        )}
-      </AnimatePresence>
-    </div>
+    <>
+      {selections.map((sel, i) => {
+        if (!sel.x || !sel.y) return null;
+        const ref = (el: HTMLDivElement | null) => { menuRefs.current[i] = el; };
+        if (sel.type === 'entity' && sel.entity) return (
+          <div key={i} ref={ref}>
+            <AnimatePresence>
+              <EntityMenu
+                entity={sel.entity}
+                x={sel.x}
+                y={sel.y}
+                onAction={(action) => onAction(action, sel)}
+              />
+            </AnimatePresence>
+          </div>
+        );
+        if (sel.type === 'chartElement' && sel.chartElement) return (
+          <div key={i} ref={ref}>
+            <AnimatePresence>
+              <ChartElementMenu
+                element={sel.chartElement}
+                x={sel.x}
+                y={sel.y}
+                onAction={(action) => onAction(action, sel)}
+              />
+            </AnimatePresence>
+          </div>
+        );
+        if (sel.type === 'tableCell' && sel.tableCell) return (
+          <div key={i} ref={ref}>
+            <AnimatePresence>
+              <TableCellMenu
+                cell={sel.tableCell}
+                x={sel.x}
+                y={sel.y}
+                onAction={(action) => onAction(action, sel)}
+              />
+            </AnimatePresence>
+          </div>
+        );
+        return null;
+      })}
+    </>
   );
 }

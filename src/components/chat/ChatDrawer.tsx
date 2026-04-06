@@ -43,7 +43,7 @@ interface ChatDrawerProps {
   onOpenThread: (message: ChatMessage, block: import('../../data/types').MessageBlock, blockIndex: number) => void;
   onCloseThread: () => void;
   placeholder?: string;
-  selection?: Selection;
+  selections?: Selection[];
   chips?: import('../../data/types').ContextChip[];
   onRemoveChip?: (id: string) => void;
   onEditChip?: (id: string, updated: import('../../data/types').ContextChip) => void;
@@ -54,6 +54,10 @@ interface ChatDrawerProps {
   selectionPath?: BreadcrumbNode[];
   onBreadcrumbNavigate?: (index: number) => void;
   onBreadcrumbClear?: () => void;
+  suggestions?: string[];
+  value?: string;
+  onChange?: (value: string) => void;
+  onSuggestionClick?: (suggestion: string) => void;
   onInputFocus?: () => void;
   onInputBlur?: () => void;
   inputRef?: React.RefObject<HTMLDivElement | null>;
@@ -67,7 +71,6 @@ function ThreadContext({
   isVisible,
   onSend,
   onClose,
-  selection,
   onEntitySelect,
   onChartElementSelect,
   onTableCellSelect,
@@ -252,7 +255,6 @@ function ThreadContext({
               isVisible={isVisible}
               compact
               onSend={onSend}
-              selection={selection}
               onEntitySelect={onEntitySelect}
               onChartElementSelect={onChartElementSelect}
               onTableCellSelect={onTableCellSelect}
@@ -288,7 +290,6 @@ export function ChatDrawer({
   onOpenThread,
   onCloseThread,
   placeholder,
-  selection,
   chips,
   onRemoveChip,
   onEditChip,
@@ -301,6 +302,10 @@ export function ChatDrawer({
   onBreadcrumbClear,
   onInputFocus,
   onInputBlur,
+  suggestions,
+  value,
+  onChange,
+  onSuggestionClick,
   inputRef,
 }: ChatDrawerProps) {
   const endRef = useRef<HTMLDivElement>(null);
@@ -344,7 +349,6 @@ export function ChatDrawer({
           isVisible={isVisible}
           onSend={onSend}
           onClose={onCloseThread}
-          selection={selection}
           onEntitySelect={onEntitySelect}
           onChartElementSelect={onChartElementSelect}
           onTableCellSelect={onTableCellSelect}
@@ -416,7 +420,6 @@ export function ChatDrawer({
                     isVisible={isVisible}
                     onOpenThread={onOpenThread}
                     onSend={onSend}
-                    selection={selection}
                     onEntitySelect={onEntitySelect}
                     onChartElementSelect={onChartElementSelect}
                     onTableCellSelect={onTableCellSelect}
@@ -431,47 +434,17 @@ export function ChatDrawer({
       )}
 
       {/* Input */}
-      <div className="flex-shrink-0 px-6 py-4 border-t border-border bg-bg-surface space-y-3">
-        {/* Context chip — shows when something is selected */}
-        {selection?.type === 'entity' && selection.entity && (
-          <motion.div
-            initial={{ opacity: 0, y: 6, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6, scale: 0.95 }}
-            className="flex items-center gap-2"
-          >
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-primary-soft rounded-full border border-primary/20">
-              <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${
-                selection.entity.type === 'metric' ? 'bg-indigo-100 text-indigo-600' :
-                selection.entity.type === 'dimension' ? 'bg-pink-100 text-pink-600' :
-                selection.entity.type === 'time' ? 'bg-amber-100 text-amber-600' :
-                selection.entity.type === 'anomaly' ? 'bg-red-100 text-red-600' :
-                'bg-emerald-100 text-emerald-600'
-              }`}>
-                {selection.entity.type}
-              </span>
-              <span className="text-[12px] font-semibold text-primary">
-                {selection.entity.display}
-              </span>
-            </div>
-            <button
-              onClick={onClearSelection}
-              className="p-1 rounded-full text-text-tertiary hover:text-text-primary hover:bg-bg-subtle transition-colors"
-              title="Clear selection"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M18 6L6 18M6 6l12 12"/>
-              </svg>
-            </button>
-          </motion.div>
-        )}
-
+      <div className="flex-shrink-0 px-6 py-4 border-t border-border bg-bg-surface">
         <div className="bg-bg-subtle rounded-xl border border-border overflow-hidden">
           <ChatInput
             onSend={onSendWithChips ?? ((msg) => onSend(msg))}
             disabled={isTyping}
             placeholder={placeholder}
             chips={chips}
+            suggestions={suggestions}
+            value={value}
+            onChange={onChange}
+            onSuggestionClick={onSuggestionClick}
             onRemoveChip={onRemoveChip}
             onEditChip={onEditChip}
             onFocus={onInputFocus}

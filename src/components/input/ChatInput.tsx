@@ -9,6 +9,10 @@ interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   chips?: ContextChip[];
+  suggestions?: string[];
+  value?: string;
+  onChange?: (value: string) => void;
+  onSuggestionClick?: (suggestion: string) => void;
   onRemoveChip?: (chipId: string) => void;
   onEditChip?: (chipId: string, updated: ContextChip) => void;
   onFocus?: () => void;
@@ -21,14 +25,21 @@ export function ChatInput({
   disabled,
   placeholder = 'Ask Pulse...',
   chips = [],
+  suggestions = [],
+  value = '',
+  onChange,
+  onSuggestionClick,
   onRemoveChip,
   onEditChip,
   onFocus,
   onBlur,
   inputRef,
 }: ChatInputProps) {
-  const [value, setValue] = useState('');
+  const [internalValue, setInternalValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Controlled if onChange provided, uncontrolled otherwise
+  const textValue = onChange !== undefined ? value : internalValue;
+  const setTextValue = onChange !== undefined ? (v: string) => { onChange(v); setInternalValue(v); } : setInternalValue;
 
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current;
@@ -38,14 +49,14 @@ export function ChatInput({
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setValue(e.target.value);
+    setTextValue(e.target.value);
     adjustHeight();
   };
 
   const handleSend = () => {
-    if (!value.trim() || disabled) return;
-    onSend(value.trim(), chips);
-    setValue('');
+    if (!textValue.trim() || disabled) return;
+    onSend(textValue.trim(), chips);
+    setTextValue('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -58,7 +69,7 @@ export function ChatInput({
     }
   };
 
-  const canSend = value.trim().length > 0 && !disabled;
+  const canSend = textValue.trim().length > 0 && !disabled;
   const hasChips = chips.length > 0;
 
   return (
@@ -69,7 +80,7 @@ export function ChatInput({
           ref={inputRef}
           initial={false}
           animate={{
-            boxShadow: value.trim() || hasChips
+            boxShadow: textValue.trim() || hasChips
               ? '0 0 15px rgba(99, 102, 241, 0.06)'
               : '0 1px 2px rgba(0,0,0,0.04)',
           }}
@@ -92,7 +103,7 @@ export function ChatInput({
             {/* Textarea — grows with content */}
             <textarea
               ref={textareaRef}
-              value={value}
+              value={textValue}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               onFocus={onFocus}
@@ -146,6 +157,31 @@ export function ChatInput({
           </motion.button>
         </motion.div>
       </div>
+      {/* Smart autocomplete suggestions */}
+      <AnimatePresence>
+        {suggestions.length > 0 && !disabled && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.15 }}
+            className="flex flex-wrap gap-2 mt-2"
+          >
+            {suggestions.map((s, i) => (
+              <motion.button
+                key={s}
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: i * 0.04 }}
+                onClick={() => onSuggestionClick?.(s)}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-primary-soft text-primary border border-primary/20 hover:bg-primary/10 hover:border-primary/40 transition-all shadow-sm"
+              >
+                {s}
+              </motion.button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <p className="text-[9px] text-text-tertiary font-bold uppercase tracking-widest text-center mt-2 opacity-50 select-none">
         <span className="bg-bg-subtle px-1.5 py-0.5 rounded border border-border-light mr-1">Enter</span> to send
         <span className="mx-2 opacity-30">|</span>
