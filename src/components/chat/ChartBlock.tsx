@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, Scatter, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import type { ChartConfig, ChartElement } from '../../data/types';
 import { BlockActions, FullscreenModal } from './BlockActions';
 
@@ -130,8 +130,38 @@ function ChartRenderer({
         <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#E2E8F0', strokeWidth: 1.5 }} />
         <Line type="monotone" dataKey={dataKey} stroke="#6366F1" strokeWidth={3}
           dot={{ fill: '#6366F1', r: 3, strokeWidth: 2, stroke: '#fff' }}
-          activeDot={{ r: 7, strokeWidth: 3, fill: '#6366F1', stroke: '#fff' }}
+          activeDot={{ r: 7, fill: '#6366F1', strokeWidth: 3, stroke: '#fff' }}
           animationDuration={1500} />
+        {/* Invisible hit targets for each data point */}
+        <Scatter
+          data={data}
+          fill="#6366F1"
+          dataKey={dataKey}
+          line={{ stroke: 'transparent' }}
+          shape={(props: any) => {
+            const i = props.index ?? 0;
+            const isHovered = hoveredIndex === i;
+            const isSelected = selectedIndex === i;
+            const base = CHART_COLORS[i % CHART_COLORS.length];
+            const active = HOVER_COLORS[i % HOVER_COLORS.length];
+            const on = isHovered || isSelected;
+            return (
+              <circle
+                cx={props.cx}
+                cy={props.cy}
+                r={8}
+                fill={on ? active : 'transparent'}
+                fillOpacity={on ? 0.15 : 0}
+                stroke={on ? active : 'transparent'}
+                strokeWidth={1.5}
+                style={{ cursor: 'pointer' }}
+              />
+            );
+          }}
+          onClick={(data: any, index: number) => { if (index !== undefined) onSelect(index); }}
+          onMouseEnter={(data: any, index: number) => { if (index !== undefined) onHover(index); }}
+          onMouseLeave={() => onLeave()}
+        />
       </LineChart>
     );
   }
