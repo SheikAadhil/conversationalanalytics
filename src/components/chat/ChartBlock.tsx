@@ -1,6 +1,6 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, SVGProps } from 'react';
 import { motion } from 'framer-motion';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ReferenceDot, ReferenceLine, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ReferenceArea, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { ChartConfig, ChartElement } from '../../data/types';
 import { BlockActions, FullscreenModal } from './BlockActions';
 
@@ -122,39 +122,66 @@ function ChartRenderer({
 
   if (type === 'line') {
     return (
-      <LineChart width={width} height={height} data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-        <XAxis dataKey={nameKey} tick={{ fontSize: 11, fill: '#94A3B8', fontWeight: 600 }} axisLine={false} tickLine={false} dy={10} />
-        <YAxis tick={{ fontSize: 11, fill: '#94A3B8', fontWeight: 600 }} axisLine={false} tickLine={false} width={45}
-          tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)} />
-        <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#E2E8F0', strokeWidth: 1.5 }} />
-        <Line type="monotone" dataKey={dataKey} stroke="#6366F1" strokeWidth={3}
-          dot={false}
-          activeDot={{ r: 7, fill: '#6366F1', strokeWidth: 3, stroke: '#fff' }}
-          animationDuration={1500}
-        />
-        {/* Clickable hit targets rendered as transparent ReferenceDots */}
-        {data.map((entry, i) => {
-          const on = selectedIndex === i || hoveredIndex === i;
-          const activeColor = HOVER_COLORS[i % HOVER_COLORS.length];
-          return (
-            <ReferenceDot
-              key={`dot-${i}`}
-              x={entry[nameKey]}
-              y={entry[dataKey]}
-              r={on ? 10 : 0}
-              fill={activeColor}
-              fillOpacity={on ? 0.2 : 0}
-              stroke={on ? activeColor : 'transparent'}
-              strokeWidth={on ? 2 : 0}
-              style={{ cursor: 'pointer' }}
-              onMouseEnter={() => onHover(i)}
-              onMouseLeave={() => onLeave()}
-              onClick={() => onSelect(i)}
-            />
-          );
-        })}
-      </LineChart>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+          <XAxis dataKey={nameKey} tick={{ fontSize: 11, fill: '#94A3B8', fontWeight: 600 }} axisLine={false} tickLine={false} dy={10} />
+          <YAxis tick={{ fontSize: 11, fill: '#94A3B8', fontWeight: 600 }} axisLine={false} tickLine={false} width={45}
+            tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)} />
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#E2E8F0', strokeWidth: 1.5 }} />
+          <Line type="monotone" dataKey={dataKey} stroke="#6366F1" strokeWidth={3}
+            dot={false}
+            activeDot={{ r: 7, fill: '#6366F1', strokeWidth: 3, stroke: '#fff' }}
+            animationDuration={1500}
+          />
+          {/* Transparent ReferenceArea hit targets for clickable line segments */}
+          {data.map((entry, i) => {
+            if (i >= data.length - 1) return null;
+            const next = data[i + 1];
+            const on = hoveredIndex === i || hoveredIndex === i + 1 || selectedIndex === i || selectedIndex === i + 1;
+            const isSelected = selectedIndex === i || selectedIndex === i + 1;
+            const activeColor = '#6366F1';
+            return (
+              <ReferenceArea
+                key={`seg-${i}`}
+                x1={entry[nameKey]}
+                x2={next[nameKey]}
+                y1={0}
+                y2="auto"
+                fill={on ? activeColor : 'transparent'}
+                fillOpacity={on ? 0.04 : 0}
+                stroke={isSelected ? activeColor : 'transparent'}
+                strokeWidth={isSelected ? 2 : 0}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={() => onHover(i)}
+                onMouseLeave={() => onLeave()}
+                onClick={() => onSelect(i)}
+                ifOverflow="extendDomain"
+              />
+            );
+          })}
+          {/* Invisible ReferenceArea at each data point for single-point selection */}
+          {data.map((entry, i) => {
+            const on = selectedIndex === i || hoveredIndex === i;
+            return (
+              <ReferenceArea
+                key={`pt-${i}`}
+                x1={entry[nameKey]}
+                x2={entry[nameKey]}
+                y1={0}
+                y2="auto"
+                fill="transparent"
+                stroke="transparent"
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={() => onHover(i)}
+                onMouseLeave={() => onLeave()}
+                onClick={() => onSelect(i)}
+                ifOverflow="extendDomain"
+              />
+            );
+          })}
+        </LineChart>
+      </ResponsiveContainer>
     );
   }
 
@@ -274,7 +301,7 @@ export function ChartBlock({ chart, onThread, onElementSelect }: ChartBlockProps
     const x = rect ? rect.left + rect.width / 2 : 500;
     const y = rect ? rect.top + rect.height / 2 : 300;
     onElementSelect({
-      type: type === 'pie' ? 'pieSlice' : type,
+      type: type === 'pie' ? 'pieSlice' : type === 'line' ? 'linePoint' : type,
       dataIndex: i,
       name: String(entry[chart.nameKey] ?? i),
       value: entry[chart.dataKey] ?? 0,
