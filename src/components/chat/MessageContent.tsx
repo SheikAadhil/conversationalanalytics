@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import type { MessageBlock, Entity, ChartElement } from '../../data/types';
+import type { MessageBlock, Entity, ChartElement, Selection } from '../../data/types';
 import { TextBlock } from './TextBlock';
 import { TableBlock } from './TableBlock';
 import { ChartBlock } from './ChartBlock';
@@ -10,12 +10,13 @@ interface MessageContentProps {
   messageId: string;
   isVisible: (blockKey: string) => boolean;
   onOpenThread?: (block: MessageBlock, blockIndex: number) => void;
+  selection?: Selection;
   onEntitySelect?: (entity: Entity, x: number, y: number) => void;
   onChartElementSelect?: (element: ChartElement, x: number, y: number) => void;
   onTableCellSelect?: (cell: { rowIndex: number; colIndex: number; value: string | number; header: string; rowLabel: string }, x: number, y: number) => void;
 }
 
-export function MessageContent({ blocks, messageId, isVisible, onOpenThread, onEntitySelect, onChartElementSelect, onTableCellSelect }: MessageContentProps) {
+export function MessageContent({ blocks, messageId, isVisible, onOpenThread, selection, onEntitySelect, onChartElementSelect, onTableCellSelect }: MessageContentProps) {
   return (
     <div className="space-y-4">
       <AnimatePresence mode="popLayout">

@@ -1,6 +1,6 @@
-import { useState, useRef, useMemo, useEffect, SVGProps } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ReferenceArea, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ReferenceArea, ReferenceDot, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { ChartConfig, ChartElement } from '../../data/types';
 import { BlockActions, FullscreenModal } from './BlockActions';
 
@@ -56,7 +56,7 @@ function sliceTopN(data: any[], key: string, n: TopN): any[] {
 function sliceThreshold(data: any[], key: string, pct: number) {
   if (pct <= 0) return { data, others: 0 };
   const total = data.reduce((s: number, d: any) => s + (d[key] || 0), 0);
-  const kept = []; let others = 0;
+  const kept: any[] = []; let others = 0;
   data.forEach((d: any) => {
     const v = d[key] || 0;
     ((v / total) * 100 >= pct ? kept : (others += v) || true) && kept.push(d);
@@ -129,54 +129,30 @@ function ChartRenderer({
           <YAxis tick={{ fontSize: 11, fill: '#94A3B8', fontWeight: 600 }} axisLine={false} tickLine={false} width={45}
             tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : String(v)} />
           <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#E2E8F0', strokeWidth: 1.5 }} />
-          <Line type="monotone" dataKey={dataKey} stroke="#6366F1" strokeWidth={3}
+          <Line
+            type="monotone"
+            dataKey={dataKey}
+            stroke="#6366F1"
+            strokeWidth={3}
             dot={false}
-            activeDot={{ r: 7, fill: '#6366F1', strokeWidth: 3, stroke: '#fff' }}
-            animationDuration={1500}
+            activeDot={false}
+            isAnimationActive={false}
           />
-          {/* Transparent ReferenceArea hit targets for clickable line segments */}
           {data.map((entry, i) => {
-            if (i >= data.length - 1) return null;
-            const next = data[i + 1];
-            const on = hoveredIndex === i || hoveredIndex === i + 1 || selectedIndex === i || selectedIndex === i + 1;
-            const isSelected = selectedIndex === i || selectedIndex === i + 1;
-            const activeColor = '#6366F1';
+            const on = hoveredIndex === i || selectedIndex === i;
             return (
-              <ReferenceArea
-                key={`seg-${i}`}
-                x1={entry[nameKey]}
-                x2={next[nameKey]}
-                y1={0}
-                y2="auto"
-                fill={on ? activeColor : 'transparent'}
-                fillOpacity={on ? 0.04 : 0}
-                stroke={isSelected ? activeColor : 'transparent'}
-                strokeWidth={isSelected ? 2 : 0}
-                style={{ cursor: 'pointer' }}
-                onMouseEnter={() => onHover(i)}
-                onMouseLeave={() => onLeave()}
-                onClick={() => onSelect(i)}
-                ifOverflow="extendDomain"
-              />
-            );
-          })}
-          {/* Invisible ReferenceArea at each data point for single-point selection */}
-          {data.map((entry, i) => {
-            const on = selectedIndex === i || hoveredIndex === i;
-            return (
-              <ReferenceArea
+              <ReferenceDot
                 key={`pt-${i}`}
-                x1={entry[nameKey]}
-                x2={entry[nameKey]}
-                y1={0}
-                y2="auto"
-                fill="transparent"
-                stroke="transparent"
+                x={entry[nameKey]}
+                y={entry[dataKey]}
+                r={on ? 7 : 5}
+                fill={on ? '#6366F1' : '#fff'}
+                stroke="#6366F1"
+                strokeWidth={2}
                 style={{ cursor: 'pointer' }}
-                onMouseEnter={() => onHover(i)}
-                onMouseLeave={() => onLeave()}
                 onClick={() => onSelect(i)}
-                ifOverflow="extendDomain"
+                onMouseEnter={() => onHover(i)}
+                onMouseLeave={onLeave}
               />
             );
           })}

@@ -7,6 +7,7 @@ interface ContextualMenuProps {
   selection: Selection;
   onAction: (action: string, selection: Selection) => void;
   onClose: () => void;
+  ignoreRef?: React.RefObject<HTMLElement | null>;
 }
 
 const CHART_ELEMENT_ACTIONS = ['drill_down', 'compare', 'explain', 'filter_to', 'show_factors'] as const;
@@ -170,18 +171,21 @@ function TableCellMenu({ cell, x, y, onAction }: {
   );
 }
 
-export function ContextualMenu({ selection, onAction, onClose }: ContextualMenuProps) {
+export function ContextualMenu({ selection, onAction, onClose, ignoreRef }: ContextualMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      // Don't close if click is inside the menu or inside the ignored element (e.g. chat input)
+      if (menuRef.current && !menuRef.current.contains(target)) {
+        if (ignoreRef?.current && ignoreRef.current.contains(target)) return;
         onClose();
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [onClose]);
+  }, [onClose, ignoreRef]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

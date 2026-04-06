@@ -15,7 +15,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import type { ChatMessage, Conversation, ChatThread, SuggestionItem, MessageBlock, Entity, Selection } from '../../data/types';
+import type { ChatMessage, Conversation, ChatThread, MessageBlock, Entity, Selection } from '../../data/types';
 import type { ChartConfig } from '../../data/types';
 import { ChatMessageItem } from './ChatMessage';
 import { TypingIndicator } from './TypingIndicator';
@@ -34,6 +34,7 @@ interface ChatDrawerProps {
   activeConversationId: string | null;
   activeThread: ChatThread | null;
   onSend: (msg: string) => void;
+  onSendWithChips?: (msg: string, chips: import('../../data/types').ContextChip[]) => void;
   onNewChat: () => void;
   onSelectConversation: (id: string) => void;
   onSelectThread: (id: string) => void;
@@ -43,6 +44,9 @@ interface ChatDrawerProps {
   onCloseThread: () => void;
   placeholder?: string;
   selection?: Selection;
+  chips?: import('../../data/types').ContextChip[];
+  onRemoveChip?: (id: string) => void;
+  onEditChip?: (id: string, updated: import('../../data/types').ContextChip) => void;
   onEntitySelect?: (entity: Entity, x: number, y: number) => void;
   onChartElementSelect?: (element: import('../../data/types').ChartElement, x: number, y: number) => void;
   onTableCellSelect?: (cell: { rowIndex: number; colIndex: number; value: string | number; header: string; rowLabel: string }, x: number, y: number) => void;
@@ -50,6 +54,9 @@ interface ChatDrawerProps {
   selectionPath?: BreadcrumbNode[];
   onBreadcrumbNavigate?: (index: number) => void;
   onBreadcrumbClear?: () => void;
+  onInputFocus?: () => void;
+  onInputBlur?: () => void;
+  inputRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 function ThreadContext({
@@ -60,6 +67,10 @@ function ThreadContext({
   isVisible,
   onSend,
   onClose,
+  selection,
+  onEntitySelect,
+  onChartElementSelect,
+  onTableCellSelect,
 }: {
   thread: ChatThread;
   messages: ChatMessage[];
@@ -68,6 +79,10 @@ function ThreadContext({
   isVisible: (key: string) => boolean;
   onSend: (msg: string) => void;
   onClose: () => void;
+  selection?: import('../../data/types').Selection;
+  onEntitySelect?: (entity: import('../../data/types').Entity, x: number, y: number) => void;
+  onChartElementSelect?: (element: import('../../data/types').ChartElement, x: number, y: number) => void;
+  onTableCellSelect?: (cell: { rowIndex: number; colIndex: number; value: string | number; header: string; rowLabel: string }, x: number, y: number) => void;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages, isTyping]);
@@ -264,6 +279,7 @@ export function ChatDrawer({
   activeConversationId,
   activeThread,
   onSend,
+  onSendWithChips,
   onNewChat,
   onSelectConversation,
   onSelectThread,
@@ -273,6 +289,9 @@ export function ChatDrawer({
   onCloseThread,
   placeholder,
   selection,
+  chips,
+  onRemoveChip,
+  onEditChip,
   onEntitySelect,
   onChartElementSelect,
   onTableCellSelect,
@@ -280,6 +299,9 @@ export function ChatDrawer({
   selectionPath,
   onBreadcrumbNavigate,
   onBreadcrumbClear,
+  onInputFocus,
+  onInputBlur,
+  inputRef,
 }: ChatDrawerProps) {
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -288,14 +310,6 @@ export function ChatDrawer({
       endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
   }, [messages, isTyping, isOpen]);
-
-  const handleSuggestion = (item: SuggestionItem) => {
-    if (item.type === 'suggestion') onSend(item.label);
-  };
-
-  // Get the last assistant message's suggestions
-  const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
-  const suggestions = lastAssistant?.suggestions ?? [];
 
   return (
     <div className="flex-1 min-w-0 flex flex-col bg-bg-surface z-10">
@@ -330,6 +344,10 @@ export function ChatDrawer({
           isVisible={isVisible}
           onSend={onSend}
           onClose={onCloseThread}
+          selection={selection}
+          onEntitySelect={onEntitySelect}
+          onChartElementSelect={onChartElementSelect}
+          onTableCellSelect={onTableCellSelect}
         />
       ) : (
         <>
@@ -448,27 +466,17 @@ export function ChatDrawer({
           </motion.div>
         )}
 
-        {/* Follow-up chips */}
-        {suggestions.length > 0 && !activeThread && (
-          <div className="flex items-center gap-2 flex-wrap mb-3">
-            <span className="text-[10px] font-bold text-text-tertiary uppercase tracking-widest opacity-60">Suggested</span>
-            {suggestions.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => handleSuggestion(item)}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-bg-subtle text-text-secondary border border-border hover:bg-primary-soft hover:text-primary hover:border-primary/30 transition-all"
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        )}
-
         <div className="bg-bg-subtle rounded-xl border border-border overflow-hidden">
           <ChatInput
-            onSend={onSend}
+            onSend={onSendWithChips ?? ((msg) => onSend(msg))}
             disabled={isTyping}
             placeholder={placeholder}
+            chips={chips}
+            onRemoveChip={onRemoveChip}
+            onEditChip={onEditChip}
+            onFocus={onInputFocus}
+            onBlur={onInputBlur}
+            inputRef={inputRef}
           />
         </div>
       </div>

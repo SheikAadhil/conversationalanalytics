@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useChat } from './hooks/useChat';
 import { Sidebar } from './components/layout/Sidebar';
 import { ChatDrawer } from './components/chat/ChatDrawer';
 import { ContextualMenu } from './components/chat/ContextualMenu';
-import { Breadcrumb, type BreadcrumbNode } from './components/chat/Breadcrumb';
-import type { ChatMessage, MessageBlock, Entity, Selection, ChartElement } from './data/types';
+import type { BreadcrumbNode } from './components/chat/Breadcrumb';
+import type { ChatMessage, MessageBlock, Entity, Selection, ChartElement, ContextChip } from './data/types';
 import type { EntityAction } from './utils/entityRecognizer';
+import { buildContextChips, buildFullQuery } from './utils/contextChipUtils';
 // Canvas panel archived — see src/archived/CanvasArchived.tsx
 
 function App() {
@@ -29,6 +30,14 @@ function App() {
 
   // Selection state
   const [selection, setSelection] = useState<Selection>({ type: null });
+  // Ref to the chat input container — ContextualMenu ignores clicks inside it
+  const inputRef = useRef<HTMLDivElement>(null);
+
+  // Chips appear immediately when something is selected (no focus required)
+  const visibleChips = useMemo(
+    () => (selection.type !== null ? buildContextChips(selection) : []),
+    [selection]
+  );
 
   // Breadcrumb path — accumulates as user drills down
   const [selectionPath, setSelectionPath] = useState<BreadcrumbNode[]>([
@@ -178,12 +187,25 @@ function App() {
     setSelection({ type: null });
   };
 
-  const placeholder = selection.type === 'entity' && selection.entity
-    ? `Ask about ${selection.entity.display}...`
-    : selection.type === 'chartElement' && selection.chartElement
-    ? `Ask about ${selection.chartElement.label}...`
-    : selection.type === 'tableCell' && selection.tableCell
-    ? `Ask about ${selection.tableCell.rowLabel}...`
+  // Chip handlers
+  const handleRemoveChip = () => {
+    setSelection({ type: null });
+  };
+
+  const handleEditChip = () => {
+    // Chip editing — selection persists, chip will rebuild on next focus
+    setIsInputFocused(false);
+  };
+
+  const handleSendWithChips = (text: string, chips: ContextChip[]) => {
+    const query = buildFullQuery(chips, text);
+    sendMessage(query);
+    setIsInputFocused(false);
+    setSelection({ type: null });
+  };
+
+  const placeholder = visibleChips.length > 0
+    ? `Ask about ${visibleChips.map(c => c.dimension ?? c.metric ?? c.timeScope ?? '').filter(Boolean).join(', ')}...`
     : 'What would you like to explore?';
 
   const activeNavId = activeThread?.id ?? activeConversationId;
@@ -224,6 +246,7 @@ function App() {
         activeConversationId={activeConversationId}
         activeThread={activeThread}
         onSend={handleSend}
+        onSendWithChips={handleSendWithChips}
         onNewChat={handleNewChat}
         onSelectConversation={(id) => {
           if (activeThread) closeThread();
@@ -238,6 +261,9 @@ function App() {
         onCloseThread={closeThread}
         placeholder={placeholder}
         selection={selection}
+        chips={visibleChips}
+        onRemoveChip={handleRemoveChip}
+        onEditChip={handleEditChip}
         onEntitySelect={handleEntitySelect}
         onChartElementSelect={handleChartElementSelect}
         onTableCellSelect={handleTableCellSelect}
@@ -245,6 +271,8 @@ function App() {
         selectionPath={selectionPath}
         onBreadcrumbNavigate={handleBreadcrumbNavigate}
         onBreadcrumbClear={handleBreadcrumbClear}
+        onInputBlur={() => {}}
+        inputRef={inputRef}
       />
 
       {/* Contextual action menu */}
@@ -252,6 +280,7 @@ function App() {
         selection={selection}
         onAction={handleAction}
         onClose={handleClearSelection}
+        ignoreRef={inputRef}
       />
     </div>
   );

@@ -22,7 +22,18 @@ export interface MessageBlock {
 }
 
 // --- Interpretation Card ---
-export type ChipType = 'metric' | 'dimension' | 'filter' | 'time_range' | 'comparison';
+export type ChipType = 'metric' | 'dimension' | 'filter' | 'time_range' | 'comparison' | 'time' | 'anomaly' | 'segment' | 'chartElement' | 'tableCell';
+
+export interface ContextChip {
+  id: string;
+  dimension?: string;
+  metric?: string;
+  timeScope?: string;
+  extra?: string;
+  chipType: ChipType;
+  sourceType: 'entity' | 'chartElement' | 'tableCell';
+  selectionKey: string;
+}
 
 export interface InterpretationChip {
   id: string;
@@ -100,6 +111,7 @@ export interface Selection {
   sourceMessageId?: string;
   x?: number;
   y?: number;
+  chips?: ContextChip[];
 }
 
 // --- Canvas State ---

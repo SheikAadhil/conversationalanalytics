@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import type { ChatMessage, MessageBlock, Entity, ChartElement } from '../../data/types';
+import type { ChatMessage, MessageBlock, Entity, ChartElement, Selection } from '../../data/types';
 import { MessageContent } from './MessageContent';
 import { TrustLayer } from './TrustLayer';
 import { FollowUpChips } from '../canvas/FollowUpChips';
@@ -11,6 +11,7 @@ interface ChatMessageProps {
   compact?: boolean;
   onOpenThread?: (message: ChatMessage, block: MessageBlock, blockIndex: number) => void;
   onSend?: (msg: string) => void;
+  selection?: Selection;
   onEntitySelect?: (entity: Entity, x: number, y: number) => void;
   onChartElementSelect?: (element: ChartElement, x: number, y: number) => void;
   onTableCellSelect?: (cell: { rowIndex: number; colIndex: number; value: string | number; header: string; rowLabel: string }, x: number, y: number) => void;
@@ -18,7 +19,7 @@ interface ChatMessageProps {
 
 export function ChatMessageItem({
   message, isVisible, compact = false,
-  onOpenThread, onSend,
+  onOpenThread, onSend, selection,
   onEntitySelect, onChartElementSelect, onTableCellSelect,
 }: ChatMessageProps) {
   const isUser = message.role === 'user';
